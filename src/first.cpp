@@ -17,7 +17,9 @@
 
 
 #include <xcb/xcb.h>
+#include <xcb/xinput.h>
 #include <X11/Xlib.h>
+#include <X11/keysym.h>
 #include "stdio.h"
 #include "stdlib.h"
 #include <dlfcn.h>
@@ -74,10 +76,37 @@ xcb_event_query_function xcb_original_wait_for_event;
 xcb_event_query_function xcb_original_poll_for_event;
 xcb_event_query_function xcb_original_poll_for_queued_event;
 
-intern s32 xinput_opcode = 131; // @HACK @TEMPORARY
+intern s32 xinput_opcode = 131; 
+intern s32 keycode_min;
+intern s32 keycode_max;
+intern s32 num_keysyms_per_keycode;
+intern KeySym *keysyms;
+
+intern
+void consume_xcb_event(xcb_generic_event_t * in_ev) {
+    auto * ev = (xcb_client_message_event_t*)in_ev;
+    ev->response_type = XCB_CLIENT_MESSAGE;
+    ev->type = 0;
+}
+
+intern
+KeySym keycode_to_keysym(s32 keycode) {
+     return keysyms[(keycode - keycode_min) * num_keysyms_per_keycode + 0];
+}
 
 intern 
 xcb_generic_event_t * event_middleman(xcb_connection_t * c, xcb_generic_event_t * ev) {
+    if(ev->response_type == XCB_GE_GENERIC) {
+        auto * e = (xcb_input_key_press_event_t*)ev;
+
+        if(e->event_type == XCB_INPUT_KEY_RELEASE || e->event_type == XCB_INPUT_KEY_PRESS) {
+            KeySym keysym = keycode_to_keysym(e->detail);
+
+            if(keysym == XK_Escape) {
+                consume_xcb_event(ev);
+            }
+        }
+    }
     return ev;
 }
 
@@ -107,17 +136,27 @@ xcb_generic_event_t * 	xcb_poll_for_queued_event (xcb_connection_t *c) {
 
 intern __attribute__((constructor))
 void library_init_main_etc_theres_no_standard_for_this_so_whatever() { 
-    xcb_original_wait_for_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_wait_for_event");
-    xcb_original_poll_for_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_poll_for_event");
-    xcb_original_poll_for_queued_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_poll_for_queued_event");
+    {
+        xcb_original_wait_for_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_wait_for_event");
+        xcb_original_poll_for_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_poll_for_event");
+        xcb_original_poll_for_queued_event = (xcb_event_query_function)dlsym(RTLD_NEXT, "xcb_poll_for_queued_event");
 
-    assert(xcb_original_wait_for_event);
-    assert(xcb_original_poll_for_event);
-    assert(xcb_poll_for_queued_event);
+        assert(xcb_original_wait_for_event);
+        assert(xcb_original_poll_for_event);
+        assert(xcb_poll_for_queued_event);
+    }
+
+    {
+        auto * display = XOpenDisplay(0);
+        XDisplayKeycodes(display, &keycode_min, &keycode_max);
+        keysyms = XGetKeyboardMapping(display, keycode_min, keycode_max - keycode_min, &num_keysyms_per_keycode);
+    }
+
 }
 
 intern __attribute__((destructor))
 void library_destruct_exit_etc_theres_no_standard_for_this_so_whatever() {
+    XFree(keysyms);
 }
 
 
