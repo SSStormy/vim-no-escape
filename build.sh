@@ -1,9 +1,10 @@
 #!/bin/bash
 
-g++ -fPIC -shared -ggdb -o libvim-no-escape.so \
+g++ -fPIC -shared -o libvim-no-escape.so \
+    -O3 \
     src/first.cpp \
     -std=c++11 \
-    -lX11 -ldl -lXi -lGLX -lm -lpthread -lGL -lXfixes \
+    -lX11 -ldl -lXi \
     -fdiagnostics-color=always 2>&1 | less
 
 if [ ${PIPESTATUS[0]} -eq 0 ] ; then
