@@ -102,9 +102,27 @@ xcb_generic_event_t * event_middleman(xcb_connection_t * c, xcb_generic_event_t 
         if(e->event_type == XCB_INPUT_KEY_RELEASE || e->event_type == XCB_INPUT_KEY_PRESS) {
             KeySym keysym = keycode_to_keysym(e->detail);
 
-            if(keysym == XK_Escape) {
-                consume_xcb_event(ev);
-            }
+#define BLOCK_KEY(__key) if(keysym == __key) consume_xcb_event(ev)
+            BLOCK_KEY(XK_Escape);
+            BLOCK_KEY(XK_KP_Enter);
+            BLOCK_KEY(XK_KP_Divide);
+            BLOCK_KEY(XK_KP_Add);
+            BLOCK_KEY(XK_KP_Multiply);
+            BLOCK_KEY(XK_KP_Subtract);
+
+            // NOTE(justas): keypad keys (XK_KP_0-9 aren't handled by gvim shrug)
+            BLOCK_KEY(65436); 
+            BLOCK_KEY(65433);
+            BLOCK_KEY(65435);
+            BLOCK_KEY(65430);
+            BLOCK_KEY(65437);
+            BLOCK_KEY(65432);
+            BLOCK_KEY(65429);
+            BLOCK_KEY(65431);
+            BLOCK_KEY(65434);
+            BLOCK_KEY(65439);
+            BLOCK_KEY(65438);
+#undef BLOCK_KEY
         }
     }
     return ev;
